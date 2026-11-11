@@ -15,7 +15,7 @@
     .dot{width:8px;height:8px;border-radius:50%;background:var(--amber)}.status.online .dot{background:var(--green);box-shadow:0 0 12px #57d6a077}.status.offline .dot{background:var(--red)}
     .intro{display:flex;justify-content:space-between;align-items:end;gap:18px;margin:0 0 18px}.eyebrow{color:var(--green);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
     h2{font-size:25px;letter-spacing:-.8px;margin:5px 0 0}.updated{color:var(--muted);font-size:12px;text-align:right}
-    .notice{border:1px solid var(--line);background:#101a29;color:var(--muted);border-radius:12px;padding:11px 14px;margin-bottom:18px;font-size:12px}.notice.error{border-color:#754141;background:#2a171b;color:#ffc4c4}
+    .notice{border:1px solid var(--line);background:#101a29;color:var(--muted);border-radius:12px;padding:11px 14px;margin-bottom:18px;font-size:12px}.notice.error{border-color:#754141;background:#2a171b;color:#ffc4c4}.alert-panel{border:1px solid var(--line);background:#101a29;border-radius:14px;padding:14px 16px;margin:-5px 0 18px}.alert-panel.has-alert{border-color:#8a4a35;background:#291b19}.alert-title{font-weight:700;margin-bottom:7px}.alert-list{margin:0;padding-left:19px;color:#ffc4c4}.alert-empty{color:var(--green)}.notify-btn{border:1px solid #36516d;background:#17283d;color:var(--text);padding:9px 12px;border-radius:10px;cursor:pointer;font:inherit;font-size:12px}.notify-btn:hover{background:#203750}.top-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}.card{background:linear-gradient(160deg,#142033,#101827);border:1px solid var(--line);border-radius:16px;padding:17px;min-height:142px}
     .cardhead{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}.ico{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:#203047;color:var(--cyan);font-size:15px}
     .value{font-size:29px;font-weight:650;letter-spacing:-1px;margin:14px 0 1px}.unit{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0}.hint{font-size:11px;color:var(--muted)}
@@ -32,13 +32,15 @@
 <main class="wrap">
   <header class="top">
     <div class="brand"><div class="logo">⌁</div><div><h1>Environment Monitor</h1><div class="sub">Behkonti · Raspberry Pi 4</div></div></div>
-    <div class="status" id="connectionStatus"><span class="dot"></span><span id="connection">Подключение…</span></div>
+    <div class="top-actions"><button class="notify-btn" id="enableNotifications" type="button">Включить уведомления</button>
+    <div class="status" id="connectionStatus"><span class="dot"></span><span id="connection">Подключение…</span></div></div>
   </header>
   <section class="intro">
     <div><div class="eyebrow">Environmental monitoring</div><h2>Панель мониторинга</h2></div>
     <div class="updated">Последнее измерение<br><strong id="lastUpdate">—</strong></div>
   </section>
   <div class="notice" id="notice">Загрузка показаний из Supabase…</div>
+  <section class="alert-panel" id="alertPanel" aria-live="polite"><div class="alert-title">Предупреждения</div><div class="alert-empty">Активных предупреждений нет</div></section>
   <section class="grid" aria-label="Показания датчиков">
     <article class="card"><div class="cardhead"><span>Температура</span><span class="ico">🌡</span></div><div class="value" id="temperature">— <span class="unit">°C</span></div><div class="hint">BME280</div></article>
     <article class="card"><div class="cardhead"><span>Влажность</span><span class="ico">💧</span></div><div class="value" id="humidity">— <span class="unit">%</span></div><div class="hint">BME280</div></article>
@@ -68,6 +70,63 @@
   const REFRESH_MS = 5000;
   const $ = (id) => document.getElementById(id);
   let climateChart, airChart, pressureChart;
+  // Демонстрационные пороги проекта; их можно изменить здесь.
+  const THRESHOLDS = { temperature: 35, eco2: 1000, tvoc: 500 };
+  let activeAlertIds = new Set();
+
+  function getAlerts(row) {
+    const alerts = [];
+    if (row.gas_detected === true) alerts.push({ id: "gas", text: "FC-22: датчик сообщил об обнаружении газа." });
+    if (row.temperature != null && Number(row.temperature) > THRESHOLDS.temperature)
+      alerts.push({ id: "temperature", text: "Высокая температура: " + numberOrDash(row.temperature) + " °C (порог " + THRESHOLDS.temperature + " °C)." });
+    if (row.ccs811_available && row.eco2 != null && Number(row.eco2) > THRESHOLDS.eco2)
+      alerts.push({ id: "eco2", text: "Повышенный eCO₂: " + numberOrDash(row.eco2, 0) + " ppm (порог " + THRESHOLDS.eco2 + " ppm)." });
+    if (row.ccs811_available && row.tvoc != null && Number(row.tvoc) > THRESHOLDS.tvoc)
+      alerts.push({ id: "tvoc", text: "Повышенный TVOC: " + numberOrDash(row.tvoc, 0) + " ppb (порог " + THRESHOLDS.tvoc + " ppb)." });
+    return alerts;
+  }
+  function updateAlerts(row, fresh) {
+    const alerts = fresh ? getAlerts(row) : [];
+    const panel = $("alertPanel");
+    panel.classList.toggle("has-alert", alerts.length > 0);
+    if (!fresh) {
+      panel.innerHTML = '<div class="alert-title">Предупреждения</div><div class="alert-empty">Нет свежих показаний. Проверь подключение Raspberry Pi.</div>';
+      activeAlertIds = new Set();
+      return;
+    }
+    if (alerts.length === 0) {
+      panel.innerHTML = '<div class="alert-title">Предупреждения</div><div class="alert-empty">Активных предупреждений нет</div>';
+    } else {
+      panel.innerHTML = '<div class="alert-title">⚠ Активные предупреждения</div><ul class="alert-list">' +
+        alerts.map(a => '<li>' + a.text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;") + '</li>').join("") +
+        '</ul>';
+    }
+    const currentIds = new Set(alerts.map(a => a.id));
+    for (const alert of alerts) {
+      if (!activeAlertIds.has(alert.id) && "Notification" in window && Notification.permission === "granted") {
+        new Notification("Environment Monitor", { body: alert.text, tag: "environment-" + alert.id });
+      }
+    }
+    activeAlertIds = currentIds;
+  }
+  $("enableNotifications").addEventListener("click", async () => {
+    if (!("Notification" in window)) {
+      $("enableNotifications").textContent = "Браузер не поддерживает";
+      return;
+    }
+    if (Notification.permission === "granted") {
+      $("enableNotifications").textContent = "Уведомления включены";
+      return;
+    }
+    if (Notification.permission === "denied") {
+      $("enableNotifications").textContent = "Разрешите в настройках браузера";
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    $("enableNotifications").textContent = permission === "granted"
+      ? "Уведомления включены"
+      : "Уведомления не разрешены";
+  });
 
   function setStatus(online, text) {
     const el = $("connectionStatus");
@@ -163,6 +222,7 @@
       const latest = rows[0];
       const date = new Date(latest.created_at);
       const fresh = Date.now() - date.getTime() < 30000;
+      updateAlerts(latest, fresh);
       setStatus(true, fresh ? "Данные поступают" : "Последняя запись устарела");
       $("notice").className = "notice";
       $("notice").textContent = fresh
