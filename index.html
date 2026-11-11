@@ -1,1 +1,70 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Environment Monitor · Behkonti</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080e19;--panel:#111b2b;--panel2:#0e1726;--line:#223149;--text:#edf4ff;--muted:#91a2ba;--green:#57d6a0;--cyan:#62c7ee;--amber:#f4bd67;--red:#f07878}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 15% 0%,#14243a 0,transparent 38%),var(--bg);color:var(--text);font:14px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .wrap{max-width:1180px;margin:auto;padding:32px 22px 48px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}
+    .brand{display:flex;align-items:center;gap:13px}.logo{width:44px;height:44px;border-radius:14px;background:linear-gradient(145deg,#1d8e76,#235d91);display:grid;place-items:center;font-size:22px;box-shadow:0 8px 28px #0005}
+    h1{font-size:21px;letter-spacing:-.5px;margin:0}.sub{color:var(--muted);font-size:12px;margin-top:3px}.status{display:flex;align-items:center;gap:9px;border:1px solid var(--line);background:#101a29;border-radius:999px;padding:8px 12px;color:var(--muted);font-size:12px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 12px #f4bd6777}
+    .intro{display:flex;justify-content:space-between;align-items:end;gap:18px;margin:0 0 18px}.eyebrow{color:var(--green);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase}
+    h2{font-size:25px;letter-spacing:-.8px;margin:5px 0 0}.updated{color:var(--muted);font-size:12px;text-align:right}
+    .notice{border:1px solid #72572d;background:#2a2115;color:#f2d6a6;border-radius:12px;padding:12px 14px;margin-bottom:18px;font-size:12px}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:13px}.card{background:linear-gradient(160deg,#142033,#101827);border:1px solid var(--line);border-radius:16px;padding:17px;min-height:142px;box-shadow:0 10px 28px #0002}
+    .cardhead{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}.ico{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:#203047;color:var(--cyan);font-size:15px}
+    .value{font-size:29px;font-weight:650;letter-spacing:-1px;margin:14px 0 1px}.unit{font-size:13px;color:var(--muted);font-weight:500;letter-spacing:0}.hint{font-size:11px;color:var(--muted)}
+    .lower{display:grid;grid-template-columns:1.5fr 1fr;gap:13px;margin-top:13px}.section{background:linear-gradient(160deg,#142033,#101827);border:1px solid var(--line);border-radius:16px;padding:18px}
+    .section h3{font-size:14px;margin:0}.sectionhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}.tag{border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--muted);font-size:10px}
+    .chart{height:190px;border:1px dashed #2a3b54;border-radius:12px;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px;background:repeating-linear-gradient(0deg,transparent,transparent 37px,#26364b55 38px)}
+    .chart strong{display:block;color:#dbe7f7;font-size:13px;margin-bottom:4px}.sensors{display:grid;gap:10px}.sensor{display:flex;align-items:center;justify-content:space-between;padding:11px 12px;border:1px solid var(--line);border-radius:11px;background:#0d1624}.sensorname{font-size:12px;font-weight:600}.sensordesc{font-size:10px;color:var(--muted)}.pill{font-size:10px;border-radius:99px;padding:4px 8px;color:var(--amber);background:#3a2b18}
+    footer{display:flex;justify-content:space-between;gap:12px;margin-top:22px;color:#71839c;font-size:11px}
+    @media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.lower{grid-template-columns:1fr}}
+    @media(max-width:540px){.wrap{padding:22px 14px 36px}.top{align-items:flex-start;flex-direction:column}.intro{align-items:flex-start;flex-direction:column}.updated{text-align:left}.grid{gap:9px}.card{padding:13px;min-height:132px}.value{font-size:25px}h2{font-size:22px}footer{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div class="brand">
+        <div class="logo">⌁</div>
+        <div><h1>Environment Monitor</h1><div class="sub">Behkonti · Raspberry Pi 4</div></div>
+      </div>
+      <div class="status"><span class="dot"></span><span id="connection">Ожидание подключения</span></div>
+    </header>
 
+    <section class="intro">
+      <div><div class="eyebrow">Environmental monitoring</div><h2>Панель мониторинга</h2></div>
+      <div class="updated">Последнее обновление<br><strong id="lastUpdate">—</strong></div>
+    </section>
+
+    <div class="notice"><strong>Источник данных ещё не подключён.</strong> Интерфейс сайта готов, но реальные показания появятся после настройки API между Raspberry Pi и сайтом. Пока значения не подменяются демонстрационными данными.</div>
+
+    <section class="grid" aria-label="Показания датчиков">
+      <article class="card"><div class="cardhead"><span>Температура</span><span class="ico">🌡</span></div><div class="value" id="temperature">— <span class="unit">°C</span></div><div class="hint">BME280</div></article>
+      <article class="card"><div class="cardhead"><span>Влажность</span><span class="ico">💧</span></div><div class="value" id="humidity">— <span class="unit">%</span></div><div class="hint">BME280</div></article>
+      <article class="card"><div class="cardhead"><span>Давление</span><span class="ico">◉</span></div><div class="value" id="pressure">— <span class="unit">hPa</span></div><div class="hint">BME280</div></article>
+      <article class="card"><div class="cardhead"><span>Газовый датчик</span><span class="ico">⌁</span></div><div class="value" id="gas">—</div><div class="hint">FC-22 · цифровой пороговый выход</div></article>
+      <article class="card"><div class="cardhead"><span>eCO₂</span><span class="ico">◌</span></div><div class="value" id="eco2">— <span class="unit">ppm</span></div><div class="hint">CCS811 · расчётная оценка</div></article>
+      <article class="card"><div class="cardhead"><span>TVOC</span><span class="ico">〰</span></div><div class="value" id="tvoc">— <span class="unit">ppb</span></div><div class="hint">CCS811</div></article>
+      <article class="card"><div class="cardhead"><span>Освещённость</span><span class="ico">☼</span></div><div class="value" id="lux">— <span class="unit">lux</span></div><div class="hint">OPT3001 · датчик пока не подключён</div></article>
+      <article class="card"><div class="cardhead"><span>Устройство</span><span class="ico">▣</span></div><div class="value" style="font-size:20px" id="device">Не в сети</div><div class="hint">Raspberry Pi 4</div></article>
+    </section>
+
+    <section class="lower">
+      <article class="section"><div class="sectionhead"><h3>История измерений</h3><span class="tag">Графики появятся после подключения API</span></div><div class="chart"><div><strong>Пока нет данных</strong>Когда Raspberry Pi начнёт отправлять измерения,<br>здесь появится история показателей.</div></div></article>
+      <article class="section"><div class="sectionhead"><h3>Состояние датчиков</h3><span class="tag">Ожидание данных</span></div><div class="sensors">
+        <div class="sensor"><div><div class="sensorname">BME280</div><div class="sensordesc">Температура · влажность · давление</div></div><span class="pill">Ожидание</span></div>
+        <div class="sensor"><div><div class="sensorname">FC-22</div><div class="sensordesc">Цифровой выход</div></div><span class="pill">Ожидание</span></div>
+        <div class="sensor"><div><div class="sensorname">CCS811</div><div class="sensordesc">eCO₂ · TVOC · опционально</div></div><span class="pill">Ожидание</span></div>
+        <div class="sensor"><div><div class="sensorname">OPT3001</div><div class="sensordesc">Освещённость · опционально</div></div><span class="pill">Не подключён</span></div>
+      </div></article>
+    </section>
+    <footer><span>Environment Monitor · Behkonti</span><span>Показания появятся после настройки защищённого канала передачи данных.</span></footer>
+  </main>
+</body>
+</html>
